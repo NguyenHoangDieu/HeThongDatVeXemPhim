@@ -7,3 +7,7 @@ export * as movieServices from './movie.service';
 export * as productServices from './product.service';
 export * as theaterServices from './theater.service';
 export * as fareServices from './fare.service';
+export * as roomServices from './room.service';
+export * as showtimeServices from './showtime.service';
+export * as promotionServices from './promotion.service';
+export * as reviewServices from './review.service';
