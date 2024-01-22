@@ -25,7 +25,7 @@ export const createTheater = async (theater: ITheater, managerPayload?: Record<s
     });
   }
 
-  if (theater.images.length) {
+  if (theater.images?.length) {
     for (let idx = 0; idx < theater.images.length; idx++) {
       newtheater.images[idx] = await cloudinaryServices.uploadImage({
         public_id: `${newtheater._id}_images_${idx}`,
@@ -55,11 +55,41 @@ export const getTheaterById = async (id: string) => {
   return theater;
 };
 
-export const getTheaterDetails = async (id: string, lang?: string) => {
-  const [theater] = await TheaterModel.aggregate([
+export const getTheaterDetails = async (id: string, lang?: string, userId?: string) => {
+  const pipelines: PipelineStage[] = [
     { $match: { _id: convertToMongooseId(id) } },
     { $set: { description: lang ? `$description.${lang}` : `$description` } }
-  ]);
+  ];
+
+  if (userId) {
+    pipelines.push(
+      {
+        $lookup: {
+          from: 'users',
+          let: { id: '$_id' },
+          pipeline: [
+            {
+              $match: { _id: convertToMongooseId(userId) }
+            },
+            {
+              $project: {
+                isFavorited: {
+                  $in: ['$$id', '$favoriteTheaters']
+                }
+              }
+            }
+          ],
+          as: 'isFavorited'
+        }
+      },
+      { $unwind: '$isFavorited' },
+      { $set: { isFavorited: '$isFavorited.isFavorited' } }
+    );
+  } else {
+    pipelines.push({ $set: { isFavorited: false } });
+  }
+
+  const [theater] = await TheaterModel.aggregate(pipelines);
 
   if (!theater) {
     throw new NotFoundError(Message.THEATER_NOT_FOUND);
@@ -112,13 +142,45 @@ export const updateTheater = async (id: string, newTheater: IUpdateTheaterReques
 };
 
 export const getTheaters = async (req: Request) => {
+  const userId = req.userPayload?.id;
+
+  const pipelines: PipelineStage[] = [];
+
+  if (userId) {
+    pipelines.push(
+      {
+        $lookup: {
+          from: 'users',
+          let: { id: '$_id' },
+          pipeline: [
+            {
+              $match: { _id: convertToMongooseId(userId) }
+            },
+            {
+              $project: {
+                isFavorited: {
+                  $in: ['$$id', '$favoriteTheaters']
+                }
+              }
+            }
+          ],
+          as: 'isFavorited'
+        }
+      },
+      { $unwind: '$isFavorited' },
+      { $set: { isFavorited: '$isFavorited.isFavorited' } }
+    );
+  } else {
+    pipelines.push({ $set: { isFavorited: false } });
+  }
+
   const options = convertRequestToPipelineStages({
     req,
     // fieldsApplySearch: ['name'],
     localizationFields: ['description']
   });
 
-  return await TheaterModel.aggregate(options);
+  return await TheaterModel.aggregate(pipelines).append(...options);
 };
 
 export const getMostRateTheaters = async (req: Request) => {
@@ -135,6 +197,36 @@ export const getMostRateTheaters = async (req: Request) => {
     { $limit: _limit }
   ];
 
+  const userId = req.userPayload?.id;
+
+  if (userId) {
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          let: { id: '$_id' },
+          pipeline: [
+            {
+              $match: { _id: convertToMongooseId(userId) }
+            },
+            {
+              $project: {
+                isFavorited: {
+                  $in: ['$$id', '$favoriteTheaters']
+                }
+              }
+            }
+          ],
+          as: 'isFavorited'
+        }
+      },
+      { $unwind: '$isFavorited' },
+      { $set: { isFavorited: '$isFavorited.isFavorited' } }
+    );
+  } else {
+    pipeline.push({ $set: { isFavorited: false } });
+  }
+
   return await TheaterModel.aggregate(pipeline);
 };
 
@@ -142,6 +234,32 @@ export const getTheatersByCity = async (req: Request) => {
   const matchCityStage: PipelineStage[] = [
     { $addFields: { city: { $trim: { input: { $last: { $split: ['$address', ','] } } } } } }
   ];
+
+  if (req.userPayload?.id) {
+    matchCityStage.push(
+      {
+        $lookup: {
+          from: 'users',
+          let: { id: '$_id' },
+          pipeline: [
+            {
+              $match: { _id: convertToMongooseId(req.userPayload?.id) }
+            },
+            {
+              $project: {
+                isFavorited: {
+                  $in: ['$$id', '$favoriteTheaters']
+                }
+              }
+            }
+          ],
+          as: 'isFavorited'
+        }
+      },
+      { $unwind: '$isFavorited' },
+      { $set: { isFavorited: '$isFavorited.isFavorited' } }
+    );
+  } else matchCityStage.push({ $set: { isFavorited: false } });
 
   if (req.query.city) {
     matchCityStage.push({
@@ -171,11 +289,18 @@ export const getTheatersByCity = async (req: Request) => {
   return await TheaterModel.aggregate(query);
 };
 
-export const getNearbyTheaters = async (long: number, lat: number) => {
+export const getNearbyTheaters = async (req: Request) => {
+  const long = req.body.longitude;
+  const lat = req.body.latitude;
   const isValidate = long >= -180 && long <= 180 && lat >= -90 && lat <= 90;
   if (!isValidate) throw new BadRequestError(Message.INVALID_COORDINATES);
 
-  return await TheaterModel.aggregate([
+  const _match = req.query.theaterId
+    ? { _id: { $ne: convertToMongooseId(req.query.theaterId as string) }, isActive: true }
+    : { isActive: true };
+
+  //! geoNear phải là stage đầu tiên
+  const pipelines: PipelineStage[] = [
     {
       $geoNear: {
         near: {
@@ -188,7 +313,39 @@ export const getNearbyTheaters = async (long: number, lat: number) => {
         spherical: true
       }
     },
-    { $match: { isActive: true } },
+    { $match: _match },
     { $limit: 5 }
-  ]);
+  ];
+
+  const userId = req.userPayload?.id;
+
+  if (userId) {
+    pipelines.push(
+      {
+        $lookup: {
+          from: 'users',
+          let: { id: '$_id' },
+          pipeline: [
+            {
+              $match: { _id: convertToMongooseId(userId) }
+            },
+            {
+              $project: {
+                isFavorited: {
+                  $in: ['$$id', '$favoriteTheaters']
+                }
+              }
+            }
+          ],
+          as: 'isFavorited'
+        }
+      },
+      { $unwind: '$isFavorited' },
+      { $set: { isFavorited: '$isFavorited.isFavorited' } }
+    );
+  } else {
+    pipelines.push({ $set: { isFavorited: false } });
+  }
+
+  return await TheaterModel.aggregate(pipelines);
 };

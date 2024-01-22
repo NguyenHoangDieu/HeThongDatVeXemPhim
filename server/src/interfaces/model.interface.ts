@@ -13,7 +13,10 @@ export interface IUser extends Document {
   avatar: string;
   role: string;
   isVerified: boolean;
+  isBlocked: boolean;
   provider: string;
+  favoriteMovies: Array<string | IMovie>;
+  favoriteTheaters: Array<string | ITheater>;
   comparePassword: (password: string) => Promise<boolean>;
   signAccessToken: () => string;
   signRefreshToken: () => string;
@@ -41,11 +44,18 @@ export interface IReview extends Document {
   isActive: boolean;
   theater: string | ITheater;
   movie: string | IMovie;
+  isSpoil: boolean;
 }
 
 export interface ITheater extends Document {
   name: string;
   address: string;
+  addressCode: {
+    city: number;
+    district: number;
+    ward: number;
+    detail: string;
+  };
   location: {
     type: string;
     coordinates: [number, number];
@@ -137,11 +147,10 @@ export interface IRoom extends Document {
 }
 
 export interface ISeat extends Document {
-  row: string; // unique
-  col: number; // unique
   coordinates: [number, number];
+  label: string; // unique
   type: string; // VIP, STANDARD, SWEET
-  status: string; // Để frontend xử lý
+  status: string;
 }
 
 // [startTime, room] --> unique --> không có 2 lịch chiếu nào cùng một phòng
@@ -196,7 +205,7 @@ export interface IBooking extends Document {
 }
 
 export interface IPayment {
-  promotion: string | IPromotion;
+  promotion: Array<string | IPromotion>;
   discountAmount: number;
   totalPrice: number;
   method: string;

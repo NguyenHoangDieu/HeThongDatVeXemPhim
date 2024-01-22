@@ -29,6 +29,10 @@ const reviewSchema: Schema<IReview> = new mongoose.Schema(
     movie: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Movie'
+    },
+    isSpoil: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true, versionKey: false }

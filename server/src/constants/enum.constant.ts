@@ -54,12 +54,6 @@ export enum SeatTypes {
   Sweetbox = 'Sweetbox'
 }
 
-export enum SeatStatus {
-  Available = 'Available',
-  Booked = 'Booked',
-  Locked = 'Locked'
-}
-
 export enum SurchargeTypes {
   Sneakshow = 'Sneakshow', // Suất chiếu sớm/đặc biệt
   Blockbuster = 'Blockbuster' // Phim bom tấn

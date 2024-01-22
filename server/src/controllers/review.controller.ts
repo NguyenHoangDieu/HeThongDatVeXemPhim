@@ -29,10 +29,27 @@ export const getReviewsByTheater = CatchAsyncError(async (req: Request, res: Res
   });
 });
 
+export const getReviewsOfMyTheater = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  const [payload] = await reviewServices.getReviewsOfMyTheater(req);
+
+  res.sendOK({
+    data: payload?.data ?? [],
+    extra: payload?.extra ?? { totalCount: 0 }
+  });
+});
+
 export const deleteReview = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
   await reviewServices.deleteReview(req.params.id);
 
   res.sendOK();
+});
+
+export const myReview = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  const review = await reviewServices.myReview(req);
+
+  res.sendOK({
+    data: review
+  });
 });
 
 export const toggleActiveReview = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {

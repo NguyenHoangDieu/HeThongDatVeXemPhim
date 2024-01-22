@@ -13,27 +13,14 @@ const adminRoles = [Roles.Manager, Roles.Admin];
 router.post('/create', isAuthenticatedOrNot, bookingController.createBooking);
 
 // [GET] List All Bookings
-router.get(
-  '/list',
-  // isAuthenticated, authorizeRoles(Roles.Admin),
-  bookingController.getBookings
-);
-router.get(
-  '/my-bookings',
-  // isAuthenticated,
-  bookingController.getBookingsByUser
-);
-router.get(
-  '/my-theater',
-  // isAuthenticated,
-  // authorizeRoles(...adminRoles),
-  bookingController.getBookingsByTheater
-);
+router.get('/list', isAuthenticated, authorizeRoles(Roles.Admin), bookingController.getBookings);
+router.get('/my-bookings', isAuthenticated, bookingController.getBookingsByUser);
+router.get('/my-theater', isAuthenticated, authorizeRoles(...adminRoles), bookingController.getBookingsByTheater);
 
 router
   .route('/details/:id')
   // [GET] Booking Details
-  .get(isAuthenticated, bookingController.getBookingDetails)
+  .get(bookingController.getBookingDetails)
   // [PATCH] Update Booking
   // .patch(isAuthenticated, authorizeRoles(...adminRoles), bookingController.updateBooking);
   // [DELETE] Delete Booking
@@ -108,8 +95,10 @@ export const bookingRouter = router;
  *                  - totalPrice
  *                properties:
  *                  promotion:
- *                    type: string
- *                    example: ''
+ *                    type: array
+ *                    items:
+ *                      type: string
+ *                    example: []
  *                  discountAmount:
  *                    type: number
  *                  totalPrice:

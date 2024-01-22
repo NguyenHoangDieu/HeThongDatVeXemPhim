@@ -18,6 +18,12 @@ router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), roomContr
 // [GET] Rooms Of Theater
 router.get('/list-by-theater/:id', roomController.getRoomsByTheater);
 
+// [POST] List Seat
+router.post('/list-seat', roomController.getSeatListWithStatus);
+
+// [GET] Rooms Of Theater
+router.get('/my-theater', isAuthenticated, authorizeRoles(...adminRoles), roomController.getMyTheaterRooms);
+
 // [PUT] Update Room
 router.put('/details/:id', isAuthenticated, authorizeRoles(...adminRoles), roomController.updateRoom);
 
@@ -70,26 +76,21 @@ export const roomRouter = router;
  *                  type: object
  *                  required:
  *                    - type
- *                    - row
- *                    - col
+ *                    - label
  *                    - coordinates
  *                  properties:
  *                    type:
  *                      type: string
- *                    row:
+ *                    label:
  *                      type: string
- *                    col:
- *                      type: number
  *                    coordinates:
  *                      type: array
  *                example:
  *                  - type: "Standard"
- *                    row: "A"
- *                    col: 1
+ *                    label: "A1"
  *                    coordinates: [0,0]
  *                  - type: "Standard"
- *                    row: "A"
- *                    col: 2
+ *                    label: "A2"
  *                    coordinates: [0,1]
  *    responses:
  *      201:
@@ -118,6 +119,70 @@ export const roomRouter = router;
  *        type: string
  *        required: true
  *        description: Theater ID
+ *    responses:
+ *      200:
+ *        description: Success
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Response'
+ */
+
+//! Rooms Of My Theater
+/**
+ * @swagger
+ * /room/my-theater:
+ *  get:
+ *    tags: [Room]
+ *    summary: "[Manager] Lấy danh sách phòng của rạp"
+ *    parameters:
+ *      - in: query
+ *        name: hl
+ *        type: string
+ *        default: vi
+ *        description: Ngôn ngữ trả về 'en | vi'
+ *    security:
+ *      - BearerToken: []
+ *    responses:
+ *      200:
+ *        description: Success
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Response'
+ */
+
+//! Seat List
+/**
+ * @swagger
+ * /room/list-seat:
+ *  post:
+ *    tags: [Room]
+ *    summary: "[All] Lấy danh sách ghế ngồi với trạng thái của từng ghế (được đặt hay chưa)"
+ *    parameters:
+ *      - in: query
+ *        name: hl
+ *        type: string
+ *        default: vi
+ *        description: Ngôn ngữ trả về 'en | vi'
+ *    security:
+ *      - BearerToken: []
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required:
+ *              - room
+ *              - showtime
+ *            properties:
+ *              room:
+ *                type: string
+ *                default: ""
+ *              showtime:
+ *                type: string
+ *                default: ""
  *    responses:
  *      200:
  *        description: Success
@@ -199,16 +264,13 @@ export const roomRouter = router;
  *                  type: object
  *                  required:
  *                    - type
- *                    - row
- *                    - col
+ *                    - label
  *                    - coordinates
  *                  properties:
  *                    type:
  *                      type: string
- *                    row:
- *                      type: number
- *                    col:
- *                      type: number
+ *                    label:
+ *                      type: string
  *                    coordinates:
  *                      type: array
  *                example: []

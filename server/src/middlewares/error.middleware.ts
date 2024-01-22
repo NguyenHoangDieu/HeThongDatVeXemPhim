@@ -5,7 +5,7 @@ import { HttpStatusCode, Message } from '../constants';
 import { ConflictError, NotFoundError, UnauthorizedError, UnprocessableEntityError } from '../models';
 
 export function ErrorMiddleware(err: any, req: Request, res: Response, next: NextFunction) {
-  logger.error(err.message);
+  logger.error(`[${err.name}]: ${err.message}`);
 
   err.statusCode = err.statusCode ?? HttpStatusCode.INTERNAL_SERVER_ERROR_500;
   err.ec = err.ec ?? err.statusCode;
@@ -33,7 +33,7 @@ export function ErrorMiddleware(err: any, req: Request, res: Response, next: Nex
   // Error: Wrong id in mongoDB
   if (err.name === 'CastError') {
     const message = req.translate(Message.RESOURCE_NOT_FOUND_INVALID_s.msg, err.path);
-    err = new UnprocessableEntityError(message);
+    err = new UnprocessableEntityError(message, undefined, (Message.RESOURCE_NOT_FOUND_INVALID_s as any).ec);
   }
 
   // Error: Duplicate key in mongoDB
@@ -47,14 +47,12 @@ export function ErrorMiddleware(err: any, req: Request, res: Response, next: Nex
 
   // Wrong JWT error
   if (err.name === 'JsonWebTokenError') {
-    const message = req.translate(Message.TOKEN_IS_INVALID_TRY_AGAIN.msg);
-    err = new UnauthorizedError(message);
+    err = new UnauthorizedError(Message.TOKEN_IS_INVALID_TRY_AGAIN);
   }
 
   // JWT EXPIRE error
   if (err.name === 'TokenExpiredError') {
-    const message = req.translate(Message.TOKEN_IS_EXPIRED_TRY_AGAIN.msg);
-    err = new UnauthorizedError(message);
+    err = new UnauthorizedError(Message.TOKEN_IS_EXPIRED_TRY_AGAIN);
   }
 
   // File not exist

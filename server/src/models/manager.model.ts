@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { type IManager } from '../interfaces/model.interface';
 import { Roles } from '../constants/enum.constant';
 import { Message } from '../constants';
+import { theaterServices } from '../services';
 
 const managerSchema: Schema<IManager> = new mongoose.Schema(
   {
@@ -17,7 +18,6 @@ const managerSchema: Schema<IManager> = new mongoose.Schema(
     password: {
       type: String,
       select: false,
-      minlength: [6, `'${Message.PASSWORD_TOO_SHORT_s.msg}', '6'`],
       required: [true, `'${Message.PASSWORD_EMPTY.msg}'`]
     },
     role: {
@@ -74,5 +74,12 @@ managerSchema.methods.signRefreshToken = function () {
     }
   );
 };
+
+// Middleware khi gọi findByIdAndDelete
+managerSchema.post('findOneAndDelete', async function (doc) {
+  if (doc?.theater) {
+    await theaterServices.deleteTheater(doc.theater, doc._id);
+  }
+});
 
 export const ManagerModel = mongoose.model<IManager>('Manager', managerSchema);

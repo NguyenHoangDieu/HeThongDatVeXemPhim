@@ -1,6 +1,6 @@
 import express from 'express';
 
-import { isAuthenticated, authorizeRoles } from '../middlewares';
+import { isAuthenticated, authorizeRoles, isAuthenticatedOrNot } from '../middlewares';
 import { movieController } from '../controllers';
 import { Roles } from '../constants';
 
@@ -11,17 +11,18 @@ const adminRoles = [Roles.Manager, Roles.Admin];
 router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), movieController.createMovie);
 
 router.get('/list', isAuthenticated, authorizeRoles(...adminRoles), movieController.getMovies);
-router.get('/now-showing', movieController.getNowShowingMovies);
-router.get('/coming-soon', movieController.getComingSoonMovies);
-router.get('/sneak-show', movieController.getSneakShowMovies);
-router.get('/most-rate', movieController.getMostRateMovies);
+
+router.get('/now-showing', isAuthenticatedOrNot, movieController.getNowShowingMovies);
+router.get('/coming-soon', isAuthenticatedOrNot, movieController.getComingSoonMovies);
+router.get('/sneak-show', isAuthenticatedOrNot, movieController.getSneakShowMovies);
+router.get('/most-rate', isAuthenticatedOrNot, movieController.getMostRateMovies);
 // router.get('/most-favorite', movieController.getComingSoonMovies);
 
 router
   .route('/details/:id')
   .put(isAuthenticated, authorizeRoles(...adminRoles), movieController.updateMovie)
   .delete(isAuthenticated, authorizeRoles(...adminRoles), movieController.deleteMovie)
-  .get(movieController.getMovieDetails);
+  .get(isAuthenticatedOrNot, movieController.getMovieDetails);
 
 export const movieRouter = router;
 
@@ -77,6 +78,8 @@ export const movieRouter = router;
  *  get:
  *    tags: [Movie]
  *    summary: "[All] Danh sách phim đang chiếu"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -115,6 +118,8 @@ export const movieRouter = router;
  *  get:
  *    tags: [Movie]
  *    summary: "[All] Danh sách phim sắp chiếu"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -149,6 +154,8 @@ export const movieRouter = router;
  *  get:
  *    tags: [Movie]
  *    summary: "[All] Danh sách phim chiếu sớm"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -179,6 +186,8 @@ export const movieRouter = router;
  *  get:
  *    tags: [Movie]
  *    summary: "[All] Top phim đánh giá cao"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -312,6 +321,8 @@ export const movieRouter = router;
  *  get:
  *    tags: [Movie]
  *    summary: "[All] Thông tin chi tiết phim"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl

@@ -1,6 +1,10 @@
+import { type Request } from 'express';
+import { type PipelineStage } from 'mongoose';
+
 import { RoomModel, NotFoundError } from '../models';
 import { type IUpdateRoomRequest, type IRoom } from '../interfaces';
 import { Message } from '../constants';
+import { convertToMongooseId } from '../utils';
 
 export const createRoom = async (room: IRoom) => {
   if (!room.theater) {
@@ -8,6 +12,7 @@ export const createRoom = async (room: IRoom) => {
   }
 
   const newRoom = new RoomModel(room);
+
   return await newRoom.save();
 };
 
@@ -28,12 +33,44 @@ export const getRoomsByTheater = async (theater: string) => {
   return rooms;
 };
 
+export const getMyTheaterRooms = async (req: Request) => {
+  const theaterId = req.userPayload?.theater;
+  if (!theaterId) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
+  const rooms = await RoomModel.find({ theater: theaterId }, { seats: false });
+
+  return rooms;
+};
+
 export const getRoomDetails = async (id: string) => {
   const rooms = await RoomModel.findById(id);
 
   return rooms;
 };
 
-export const updateSeat = async (id: string) => {
-  //
+export const getSeatListWithStatus = async (room: string, showtime: string) => {
+  const pipelines: PipelineStage[] = [
+    { $match: { _id: convertToMongooseId(room) } },
+    { $unwind: '$seats' },
+    { $replaceRoot: { newRoot: '$seats' } },
+    {
+      $lookup: {
+        from: 'bookings',
+        localField: '_id',
+        foreignField: 'seats',
+        pipeline: [{ $project: { _id: 1, showtime: 1 } }, { $match: { showtime: convertToMongooseId(showtime) } }],
+        as: 'seatsBooked'
+      }
+    },
+    { $unwind: { path: '$seatsBooked', preserveNullAndEmptyArrays: true } },
+    {
+      $set: {
+        status: { $cond: [{ $ifNull: ['$seatsBooked', false] }, 'Booked', 'Available'] }
+      }
+    }
+  ];
+
+  return await RoomModel.aggregate(pipelines);
 };

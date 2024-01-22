@@ -27,7 +27,7 @@ export const updateTheater = CatchAsyncError(async (req: Request, res: Response,
 });
 
 export const getTheaterDetails = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  const theater = await theaterServices.getTheaterDetails(req.params.id, req.getLocale());
+  const theater = await theaterServices.getTheaterDetails(req.params.id, req.getLocale(), req.userPayload?.id);
 
   res.sendOK({
     data: theater
@@ -61,7 +61,7 @@ export const getMostRateTheaters = CatchAsyncError(async (req: Request, res: Res
 });
 
 export const getNearByTheaters = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  const payload = await theaterServices.getNearbyTheaters(req.body.longitude, req.body.latitude);
+  const payload = await theaterServices.getNearbyTheaters(req);
 
   res.sendOK({
     data: payload

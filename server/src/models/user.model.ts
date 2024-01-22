@@ -42,6 +42,10 @@ const userSchema: Schema<IUser> = new mongoose.Schema(
       type: String,
       default: DEFAULT_AVATAR_URL
     },
+    isBlocked: {
+      type: Boolean,
+      default: false
+    },
     phoneNumber: String,
     role: {
       type: String,
@@ -62,7 +66,19 @@ const userSchema: Schema<IUser> = new mongoose.Schema(
         message: `'${Message.INVALID_LOGIN_METHOD.msg}'`
       },
       default: EmailProviders.Email
-    }
+    },
+    favoriteMovies: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Movie'
+      }
+    ],
+    favoriteTheaters: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Theater'
+      }
+    ]
   },
   { timestamps: true, versionKey: false }
 );

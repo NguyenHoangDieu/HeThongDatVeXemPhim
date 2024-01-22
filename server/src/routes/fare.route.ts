@@ -16,10 +16,13 @@ router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), fareContr
 router.get('/theater/:id', fareController.getFareByTheater);
 
 // [PUT] Update Fare
-router.put('/details/:id', isAuthenticated, authorizeRoles(...adminRoles), fareController.updateFare);
+router.put('/details', isAuthenticated, authorizeRoles(...adminRoles), fareController.updateFare);
 
 // [DELETE] Delete Fare
-router.delete('/details/:id', isAuthenticated, authorizeRoles(...adminRoles), fareController.deleteFare);
+router.delete('/details', isAuthenticated, authorizeRoles(...adminRoles), fareController.deleteFare);
+
+// [GET] Get Fare
+router.get('/details', isAuthenticated, authorizeRoles(...adminRoles), fareController.getFare);
 
 export const fareRouter = router;
 
@@ -240,7 +243,7 @@ export const fareRouter = router;
 //! Cập nhật giá vé
 /**
  * @swagger
- * /fare/details/{id}:
+ * /fare/details:
  *  put:
  *    tags: [Fare]
  *    summary: "[Manager] Cập nhật bảng giá vé"
@@ -252,11 +255,6 @@ export const fareRouter = router;
  *        type: string
  *        default: vi
  *        description: Ngôn ngữ trả về 'en | vi'
- *      - in: path
- *        name: id
- *        type: string
- *        required: true
- *        description: Fare ID
  *    requestBody:
  *      required: true
  *      content:
@@ -404,7 +402,7 @@ export const fareRouter = router;
 //! Xóa bảng giá
 /**
  * @swagger
- * /fare/details/{id}:
+ * /fare/details:
  *  delete:
  *    tags: [Fare]
  *    summary: "[Manager] Xóa bảng giá"
@@ -416,11 +414,30 @@ export const fareRouter = router;
  *        type: string
  *        default: vi
  *        description: Ngôn ngữ trả về 'en | vi'
- *      - in: path
- *        name: id
+ *    responses:
+ *      200:
+ *        description: Success
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Response'
+ */
+
+//! Thông tin bảng giá
+/**
+ * @swagger
+ * /fare/details:
+ *  get:
+ *    tags: [Fare]
+ *    summary: "[Manager] Lấy bảng giá"
+ *    security:
+ *      - BearerToken: []
+ *    parameters:
+ *      - in: query
+ *        name: hl
  *        type: string
- *        required: true
- *        description: Fare ID
+ *        default: vi
+ *        description: Ngôn ngữ trả về 'en | vi'
  *    responses:
  *      200:
  *        description: Success

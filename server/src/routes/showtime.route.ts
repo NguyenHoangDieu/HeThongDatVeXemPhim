@@ -18,6 +18,8 @@ router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), showtimeC
 router.get('/list-by-movie/:id', showtimeController.getShowtimesByMovie);
 // [GET] List Showtime By Theater
 router.get('/list-by-theater/:id', showtimeController.getShowtimesByTheater);
+// [GET] List Showtime Of My Theater
+router.get('/my-theater', isAuthenticated, authorizeRoles(...adminRoles), showtimeController.getMyTheaterShowtimes);
 
 router
   .route('/details/:id')
@@ -116,6 +118,51 @@ export const showtimeRouter = router;
  *              $ref: '#/components/schemas/Response'
  */
 
+//! Danh sách lịch chiếu của my rạp
+/**
+ * @swagger
+ * /showtime/my-theater:
+ *  get:
+ *    tags: [Showtime]
+ *    summary: "[Manager] Lấy danh sách lịch chiếu của rạp"
+ *    parameters:
+ *      - in: query
+ *        name: hl
+ *        type: string
+ *        default: vi
+ *        description: Ngôn ngữ trả về 'en | vi'
+ *      - in: query
+ *        name: keyword
+ *        type: string
+ *        description: Tìm theo tên
+ *      - in: query
+ *        name: page
+ *        type: string
+ *        description: Trang hiện tại
+ *      - in: query
+ *        name: limit
+ *        type: string
+ *        description: Số lượng kết quả mỗi trang
+ *      - in: query
+ *        name: sort
+ *        type: string
+ *        hint: ht
+ *        description: Sắp xếp (\+name, name, \-name)
+ *      - in: query
+ *        name: fields
+ *        type: string
+ *        description: Giới hạn trường trả về (cách nhau bởi dấu phẩy)
+ *    security:
+ *      - BearerToken: []
+ *    responses:
+ *      200:
+ *        description: Success
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Response'
+ */
+
 //! Thêm lịch chiếu
 /**
  * @swagger
@@ -140,14 +187,10 @@ export const showtimeRouter = router;
  *            required:
  *              - startTime
  *              - movie
- *              - theater
  *              - room
  *              - language
  *            properties:
  *              movie:
- *                type: string
- *                default: ""
- *              theater:
  *                type: string
  *                default: ""
  *              room:

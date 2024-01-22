@@ -1,6 +1,6 @@
 import express from 'express';
 
-import { authorizeRoles, isAuthenticated } from '../middlewares';
+import { authorizeRoles, isAuthenticated, isAuthenticatedOrNot } from '../middlewares';
 import { Roles } from '../constants';
 import { theaterController } from '../controllers';
 
@@ -11,15 +11,15 @@ const adminRoles = [Roles.Manager, Roles.Admin];
 
 router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), theaterController.createTheater);
 
-router.get('/list', theaterController.getTheaters);
-router.get('/list-by-city', theaterController.getTheatersByCity);
-router.get('/most-rate', theaterController.getMostRateTheaters);
+router.get('/list', isAuthenticatedOrNot, theaterController.getTheaters);
+router.get('/list-by-city', isAuthenticatedOrNot, theaterController.getTheatersByCity);
+router.get('/most-rate', isAuthenticatedOrNot, theaterController.getMostRateTheaters);
 
-router.post('/nearby', theaterController.getNearByTheaters);
+router.post('/nearby', isAuthenticatedOrNot, theaterController.getNearByTheaters);
 
 router
   .route('/details/:id')
-  .get(theaterController.getTheaterDetails)
+  .get(isAuthenticatedOrNot, theaterController.getTheaterDetails)
   .delete(isAuthenticated, authorizeRoles(...adminRoles), theaterController.deleteTheater)
   .put(isAuthenticated, authorizeRoles(...adminRoles), theaterController.updateTheater);
 
@@ -32,6 +32,8 @@ export const theaterRouter = router;
  *  get:
  *    tags: [Theater]
  *    summary: "[All] Danh sách theater"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -75,6 +77,8 @@ export const theaterRouter = router;
  *  get:
  *    tags: [Theater]
  *    summary: "[All] Danh sách rạp trong thành phố"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -109,6 +113,8 @@ export const theaterRouter = router;
  *  get:
  *    tags: [Theater]
  *    summary: "[All] Top rạp đánh giá cao"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -139,12 +145,19 @@ export const theaterRouter = router;
  *  post:
  *    tags: [Theater]
  *    summary: "[All] Danh sách theater ở gần"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
  *        type: string
  *        default: vi
  *        description: Ngôn ngữ trả về 'en | vi'
+ *      - in: query
+ *        name: theaterId
+ *        type: string
+ *        required: true
+ *        description: TheaterID (bỏ qua không xét tới)
  *    requestBody:
  *      required: true
  *      content:
@@ -205,6 +218,7 @@ export const theaterRouter = router;
  *              - email
  *              - hotline
  *              - address
+ *              - addressCode
  *              - location
  *            properties:
  *              name:
@@ -228,6 +242,21 @@ export const theaterRouter = router;
  *              address:
  *                type: string
  *                example: ''
+ *              addressCode:
+ *                type: object
+ *                properties:
+ *                  city:
+ *                    type: number
+ *                    example: 1
+ *                  district:
+ *                    type: number
+ *                    example: 1
+ *                  ward:
+ *                    type: number
+ *                    example: 1
+ *                  detail:
+ *                    type: string
+ *                    example: "Số nhà"
  *              location:
  *                type: object
  *                description: "type: Point, coordinates: [long, lat]"
@@ -303,6 +332,21 @@ export const theaterRouter = router;
  *              address:
  *                type: string
  *                example: ""
+ *              addressCode:
+ *                type: object
+ *                properties:
+ *                  city:
+ *                    type: number
+ *                    example: 1
+ *                  district:
+ *                    type: number
+ *                    example: 1
+ *                  ward:
+ *                    type: number
+ *                    example: 1
+ *                  detail:
+ *                    type: string
+ *                    example: "Số nhà"
  *              location:
  *                type: object
  *                description: "type: Point, coordinates: [long, lat]"
@@ -340,6 +384,8 @@ export const theaterRouter = router;
  *  get:
  *    tags: [Theater]
  *    summary: "[All] Thông tin chi tiết theater"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl

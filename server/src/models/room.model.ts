@@ -1,7 +1,7 @@
 import mongoose, { type Schema } from 'mongoose';
 
 import { type ISeat, type IRoom } from '../interfaces';
-import { Message, RoomTypes, SeatStatus, SeatTypes } from '../constants';
+import { Message, RoomTypes, SeatTypes } from '../constants';
 import { ConflictError } from '.';
 
 const seatSchema: Schema<ISeat> = new mongoose.Schema(
@@ -14,13 +14,9 @@ const seatSchema: Schema<ISeat> = new mongoose.Schema(
       },
       required: [true, `'${Message.FIELD_s_EMPTY.msg}', 'type'`]
     },
-    row: {
+    label: {
       type: String,
-      required: [true, `'${Message.FIELD_s_EMPTY.msg}', 'row'`]
-    },
-    col: {
-      type: Number,
-      required: [true, `'${Message.FIELD_s_EMPTY.msg}', 'col'`]
+      required: [true, `'${Message.FIELD_s_EMPTY.msg}', 'label'`]
     },
     coordinates: {
       type: [Number, Number],
@@ -28,11 +24,7 @@ const seatSchema: Schema<ISeat> = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: {
-        values: Object.values(SeatStatus),
-        message: `'${Message.INVALID_SEAT_TYPE_s.msg}', '{VALUE}'`
-      },
-      default: SeatStatus.Available
+      default: 'Available'
     }
   },
   { timestamps: true, versionKey: false }
@@ -84,7 +76,7 @@ roomSchema.pre('save', function (next, done) {
     const size = this.seats.length;
 
     // Validate row-col
-    if (new Set(this.seats.map((e) => `${e.row}-${e.col}`)).size !== size) {
+    if (new Set(this.seats.map((e) => `${e.label}-${e.coordinates.toString()}`)).size !== size) {
       next(new ConflictError(Message.INVALID_ROOM_SEATS_ROW_COL));
       return;
     }

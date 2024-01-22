@@ -1,7 +1,7 @@
 import express from 'express';
 
 import { updateGenre, createGenre, getGenres, getGenre, deleteGenre } from '../controllers/genre.controller';
-import { isAuthenticated, authorizeRoles } from '../middlewares';
+import { isAuthenticated, authorizeRoles, isAuthenticatedOrNot } from '../middlewares';
 import { Roles } from '../constants';
 
 const router = express.Router();
@@ -13,7 +13,7 @@ const adminRoles = [Roles.Manager, Roles.Admin];
 router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), createGenre);
 
 // [GET] List Genres
-router.get('/list', getGenres);
+router.get('/list', isAuthenticatedOrNot, getGenres);
 
 // [GET] Genre
 router.get('/details/:id', getGenre);

@@ -1,5 +1,5 @@
 export * from './auth.controller';
-export * from './user.controller';
+export * as userController from './user.controller';
 export * from './person.controller';
 export * as managerController from './manager.controller';
 export * as movieController from './movie.controller';
@@ -12,3 +12,4 @@ export * as showtimeController from './showtime.controller';
 export * as promotionController from './promotion.controller';
 export * as reviewController from './review.controller';
 export * as bookingController from './booking.controller';
+export * as reportController from './report.controller';

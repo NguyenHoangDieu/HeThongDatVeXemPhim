@@ -17,13 +17,13 @@ export const getFareByTheater = CatchAsyncError(async (req: Request, res: Respon
   const fare = await fareServices.getFareByTheater(req.params.id, req.getLocale());
 
   res.sendOK({
-    data: fare ?? {}
+    data: fare
   });
 });
 
 // Update Fare
 export const updateFare = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  const fare = await fareServices.updateFare(req.params.id, req.body);
+  const fare = await fareServices.updateFare(req, req.body);
 
   res.sendCREATED({
     data: fare
@@ -32,7 +32,16 @@ export const updateFare = CatchAsyncError(async (req: Request, res: Response, ne
 
 // Delete Fare
 export const deleteFare = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  await fareServices.deleteFare(req.params.id);
+  await fareServices.deleteFare(req);
 
   res.sendOK();
+});
+
+// Get Fare
+export const getFare = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  const fare = await fareServices.getFare(req);
+
+  res.sendOK({
+    data: fare
+  });
 });

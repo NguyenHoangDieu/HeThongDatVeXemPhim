@@ -1,7 +1,10 @@
 import { PromotionModel, NotFoundError } from '../models';
-import { type IUpdatePromotionRequest, type IPromotion } from '../interfaces';
+import { type IUpdatePromotionRequest, type IPromotion, type IApplyPromotionRequest } from '../interfaces';
 import { Message, PROMOTION_UPLOAD_FOLDER } from '../constants';
 import { cloudinaryServices } from '.';
+import dayjs from 'dayjs';
+import { type PipelineStage } from 'mongoose';
+import { convertToMongooseId } from '../utils';
 
 export const createPromotion = async (promotion: IPromotion) => {
   if (!promotion.theater) {
@@ -15,6 +18,34 @@ export const createPromotion = async (promotion: IPromotion) => {
 
   const _promotion = new PromotionModel(promotion);
   return await _promotion.save();
+};
+
+export const applyPromotion = async (body: IApplyPromotionRequest, userId?: string) => {
+  const pipelines: PipelineStage[] = [
+    { $match: { theater: convertToMongooseId(body.theater), isActive: true, code: body.code } },
+    { $set: { isUsed: { $in: [convertToMongooseId(userId), '$userUsed'] } } }
+  ];
+
+  const [promotion] = await PromotionModel.aggregate(pipelines);
+  if (!promotion) {
+    throw new NotFoundError(Message.PROMOTION_NOT_FOUND);
+  }
+
+  if (promotion.isUsed) {
+    throw new NotFoundError(Message.PROMOTION_USED);
+  }
+
+  const startTime = dayjs(body.startTime).format('YYYY-MM-DD HH:mm');
+  const promotionStartTime = dayjs(promotion.startTime).format('YYYY-MM-DD HH:mm');
+
+  if (startTime < promotionStartTime) {
+    throw new NotFoundError(Message.PROMOTION_EXPIRED_OR_UNAVAILABLE);
+  }
+  if (promotion.endTime && startTime > dayjs(promotion.endTime).format('YYYY-MM-DD HH:mm')) {
+    throw new NotFoundError(Message.PROMOTION_EXPIRED_OR_UNAVAILABLE);
+  }
+
+  return promotion;
 };
 
 export const deletePromotion = async (id: string) => {
@@ -59,10 +90,13 @@ export const getPromotionDetails = async (id: string) => {
   return promotion;
 };
 
-export const getPromotionsByTheater = async (theater: string) => {
-  const promotion = await PromotionModel.find({ theater, isActive: true });
+export const getPromotionsByTheater = async (theater: string, userId?: string) => {
+  const pipelines: PipelineStage[] = [
+    { $match: { theater: convertToMongooseId(theater), isActive: true } },
+    { $set: { isUsed: { $in: [convertToMongooseId(userId), '$userUsed'] } } }
+  ];
 
-  return promotion;
+  return await PromotionModel.aggregate(pipelines);
 };
 
 export const getMyTheaterPromotions = async (theater?: string) => {

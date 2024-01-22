@@ -62,6 +62,7 @@ export interface IUpdateProductRequest {
 export interface IUpdateTheaterRequest {
   name?: string;
   address?: string;
+  addressCode?: Record<string, any>;
   location?: string;
   email?: string;
   description?: string;
@@ -106,11 +107,9 @@ export interface IUpdateRoomRequest {
   name?: string;
   capacity?: number;
   seats?: Array<{
-    row: string;
-    col: number;
+    label: string;
     coordinates: [number, number];
     type?: string;
-    status?: string;
   }>;
   isActive?: boolean;
 }
@@ -135,9 +134,11 @@ export interface IUpdatePromotionRequest {
   isActive?: boolean;
 }
 
-// export interface IUpdateBookingRequest {
-
-// }
+export interface IApplyPromotionRequest {
+  code: string;
+  theater: string;
+  startTime: Date;
+}
 
 export interface IOTPRequest {
   id: string;

@@ -12,4 +12,4 @@ export * as showtimeServices from './showtime.service';
 export * as promotionServices from './promotion.service';
 export * as reviewServices from './review.service';
 export * as bookingServices from './booking.service';
-export * as reservationServices from './reservation.service';
+export * as reportServices from './report.service';

@@ -1,6 +1,6 @@
 import express from 'express';
 
-import { isAuthenticated, authorizeRoles } from '../middlewares';
+import { isAuthenticated, authorizeRoles, isAuthenticatedOrNot } from '../middlewares';
 import { Roles } from '../constants';
 import { promotionController } from '../controllers';
 
@@ -12,8 +12,11 @@ const adminRoles = [Roles.Manager, Roles.Admin];
 // [POST] Add Promotion
 router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), promotionController.createPromotion);
 
+// [POST] Apply Promotion
+router.post('/apply', isAuthenticated, promotionController.applyPromotion);
+
 // [GET] List Promotion Of Theater
-router.get('/list-by-theater/:id', promotionController.getPromotionsByTheater);
+router.get('/list-by-theater/:id', isAuthenticatedOrNot, promotionController.getPromotionsByTheater);
 // [GET] List Promotion Of My Theater
 router.get('/my-theater', isAuthenticated, authorizeRoles(...adminRoles), promotionController.getMyTheaterPromotions);
 
@@ -35,6 +38,8 @@ export const promotionRouter = router;
  *  get:
  *    tags: [Promotion]
  *    summary: "[All] Danh sách khuyến mãi của rạp (isActive=true)"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl
@@ -131,6 +136,50 @@ export const promotionRouter = router;
  *                "enum": [ "Amount", "Percentage"]
  *    responses:
  *      201:
+ *        description: Success
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Response'
+ */
+
+//! Áp dụng khuyến mãi
+/**
+ * @swagger
+ * /promotion/apply:
+ *  post:
+ *    tags: [Promotion]
+ *    summary: "[User] Áp dụng/Tìm khuyến mãi"
+ *    security:
+ *      - BearerToken: []
+ *    parameters:
+ *      - in: query
+ *        name: hl
+ *        type: string
+ *        default: vi
+ *        description: Ngôn ngữ trả về 'en | vi'
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required:
+ *              - theater
+ *              - code
+ *              - startTime
+ *            properties:
+ *              theater:
+ *                type: string
+ *                default: ""
+ *              code:
+ *                type: string
+ *                default: ""
+ *              startTime:
+ *                type: Date
+ *                default: ""
+ *    responses:
+ *      200:
  *        description: Success
  *        content:
  *          application/json:

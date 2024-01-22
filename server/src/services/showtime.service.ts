@@ -2,12 +2,16 @@ import { type Request } from 'express';
 import { type PipelineStage } from 'mongoose';
 import dayjs from 'dayjs';
 
-import { Message } from '../constants';
+import { Message, RoomTypes } from '../constants';
 import { type IUpdateShowtimeRequest, type IShowtime } from '../interfaces';
-import { NotFoundError, ShowtimeModel } from '../models';
-import { addPaginationPipelineStage, convertToMongooseId } from '../utils';
+import { FareModel, NotFoundError, ShowtimeModel } from '../models';
+import { addPaginationPipelineStage, isSpecialDay, convertToMongooseId } from '../utils';
 
 export const createShowtime = async (showtime: IShowtime) => {
+  if (!showtime.theater) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
   const _showtime = new ShowtimeModel(showtime); // Custom Validate trong middleware
 
   return await _showtime.save();
@@ -26,15 +30,6 @@ export const deleteShowtime = async (id: string) => {
   return await ShowtimeModel.findByIdAndDelete(id);
 };
 
-export const getShowtimeDetails = async (id: string) => {
-  const _showtime = await ShowtimeModel.findById(id).populate(['movie', 'theater', 'room']);
-  if (!_showtime) {
-    throw new NotFoundError(Message.SHOWTIME_NOT_FOUND);
-  }
-
-  return _showtime;
-};
-
 // Groupby date
 // Gồm nhiều rạp
 // Mỗi rạp có list lịch chiếu tương ứng với phim đó
@@ -49,7 +44,7 @@ export const getShowtimesByMovie = async (id: string, req: Request) => {
         $expr: {
           $cond: [
             req.query.date,
-            { $eq: [{ $dateToString: { format: '%Y-%m-%d', date: '$startTime' } }, req.query.date] },
+            { $eq: [{ $dateToString: { format: '%Y-%m-%d', date: '$startTime', timezone: '+07' } }, req.query.date] },
             { $gte: ['$startTime', dayjs(new Date()).startOf('day').toDate()] }
           ]
         },
@@ -76,7 +71,7 @@ export const getShowtimesByMovie = async (id: string, req: Request) => {
       }
     },
     // 3. Deconstruct array of objects --> object
-    { $unwind: '$room' },
+    { $unwind: { path: '$room', preserveNullAndEmptyArrays: true } },
     // 4. Filter theo format nếu truyền
     {
       $match: {
@@ -89,7 +84,7 @@ export const getShowtimesByMovie = async (id: string, req: Request) => {
     {
       $group: {
         _id: {
-          date: { $dateToString: { format: '%Y-%m-%d', date: '$startTime' } },
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$startTime', timezone: '+07' } },
           theater: '$theater',
           type: { $concat: ['$room.type', ' ', '$language'] }
         },
@@ -133,7 +128,7 @@ export const getShowtimesByMovie = async (id: string, req: Request) => {
       }
     },
     // 8. Deconstruct array thành từng document (movie quan hệ 1-1 <=> mảng 1 phần tử kiểu obj <=> covert [{}] về {})
-    { $unwind: '$theater' },
+    { $unwind: { path: '$theater', preserveNullAndEmptyArrays: true } },
     // 9. Filter theo thành phố nếu truyền
     {
       $match: {
@@ -183,7 +178,7 @@ export const getShowtimesByTheater = async (id: string, req: Request) => {
         $expr: {
           $cond: [
             req.query.date,
-            { $eq: [{ $dateToString: { format: '%Y-%m-%d', date: '$startTime' } }, req.query.date] },
+            { $eq: [{ $dateToString: { format: '%Y-%m-%d', date: '$startTime', timezone: '+07' } }, req.query.date] },
             { $gte: ['$startTime', dayjs(new Date()).startOf('day').toDate()] }
           ]
         },
@@ -210,12 +205,12 @@ export const getShowtimesByTheater = async (id: string, req: Request) => {
       }
     },
     // 3. Deconstruct array of objects --> object
-    { $unwind: '$room' },
+    { $unwind: { path: '$room', preserveNullAndEmptyArrays: true } },
     // 4. Group lần lượt theo data (y-m-d) --> movie --> type = format + language (vd: 2D Subtitles)
     {
       $group: {
         _id: {
-          date: { $dateToString: { format: '%Y-%m-%d', date: '$startTime' } },
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$startTime', timezone: '+07' } },
           movie: '$movie',
           type: { $concat: ['$room.type', ' ', '$language'] }
         },
@@ -254,7 +249,17 @@ export const getShowtimesByTheater = async (id: string, req: Request) => {
               type: 1,
               duration: 1,
               ageType: 1,
+              genres: 1,
               trailer: 1
+            }
+          },
+          {
+            $lookup: {
+              from: 'genres',
+              localField: 'genres',
+              foreignField: '_id',
+              as: 'genres',
+              pipeline: [{ $project: { name: `$name.${req.getLocale()}` } }]
             }
           }
         ],
@@ -262,7 +267,7 @@ export const getShowtimesByTheater = async (id: string, req: Request) => {
       }
     },
     // 7. Deconstruct array thành từng document (movie quan hệ 1-1 <=> mảng 1 phần tử kiểu obj <=> covert [{}] về {})
-    { $unwind: '$movie' },
+    { $unwind: { path: '$movie', preserveNullAndEmptyArrays: true } },
     // 8. Nhóm movie tương ứng với data (type + list lịch chiếu)
     {
       $group: {
@@ -280,6 +285,121 @@ export const getShowtimesByTheater = async (id: string, req: Request) => {
     { $set: { _id: '$$REMOVE' } },
     // 10. Sắp xếp dữ liệu
     { $sort: { date: 1, 'movies.types.showtimes.startTime': 1 } }
+  ];
+
+  addPaginationPipelineStage({ req, pipeline });
+
+  return await ShowtimeModel.aggregate(pipeline);
+};
+
+export const getShowtimeDetails = async (id: string) => {
+  const _showtime = await ShowtimeModel.findOne({ _id: id, isActive: true })
+    .populate('movie', { title: 1, originalTitle: 1, poster: 1, ageType: 1, formats: 1 })
+    .populate('theater', { name: 1 })
+    .populate('room', { name: 1, type: 1 });
+  if (!_showtime) {
+    throw new NotFoundError(Message.SHOWTIME_NOT_FOUND);
+  }
+
+  // Lấy bảng giá
+  const is2D = (_showtime.room as any).type === RoomTypes['2D'];
+  const project = is2D
+    ? { weekend: 1, specialDay: 1, surcharge: 1, _2d: 1 }
+    : { weekend: 1, specialDay: 1, surcharge: 1, _3d: 1 };
+
+  const fare = await FareModel.findOne<any>({ theater: _showtime.theater }, project);
+  if (!fare) throw new NotFoundError(Message.FARE_NOT_FOUND);
+
+  const hhmm = new Date(_showtime.startTime).toLocaleTimeString(undefined, {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const _isSpecialDay = isSpecialDay(_showtime.startTime, fare.weekend, fare.specialDay);
+  const price = fare[`${is2D ? '_2d' : '_3d'}`].find((e) => {
+    const greaterThanLeft = e.from === '' ? true : hhmm >= e.from;
+    const lessThanRight = e.to === '' ? true : hhmm <= e.to;
+    return lessThanRight && greaterThanLeft;
+  })?.seat;
+
+  const _price: Record<string, any> = {};
+  price.forEach((e) => {
+    _price[e.type] = _isSpecialDay ? e.specialDayPrice : e.normalDayPrice;
+  });
+
+  return { price: _price, showtime: _showtime };
+};
+
+export const getMyTheaterShowtimes = async (req: Request) => {
+  const theaterId = req.userPayload?.theater;
+  if (!theaterId) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
+  const pipeline: PipelineStage[] = [
+    {
+      $match: { theater: convertToMongooseId(theaterId) }
+    },
+    {
+      $lookup: {
+        from: 'movies',
+        localField: 'movie',
+        foreignField: '_id',
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              poster: 1,
+              originalTitle: 1,
+              type: 1,
+              duration: 1,
+              ageType: 1,
+              trailer: 1
+            }
+          }
+        ],
+        as: 'movie'
+      }
+    },
+    { $unwind: { path: '$movie', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: 'rooms',
+        localField: 'room',
+        foreignField: '_id',
+        pipeline: [{ $project: { _id: 1, name: 1, type: 1 } }],
+        as: 'room'
+      }
+    },
+    { $unwind: { path: '$room', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: {
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$startTime', timezone: '+07' } },
+          room: '$room'
+        },
+        data: { $push: '$$ROOT' }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          date: '$_id.date'
+        },
+        date: { $first: '$_id.date' },
+        rooms: {
+          $push: {
+            room: '$_id.room',
+            showtimes: '$data'
+          }
+        }
+      }
+    },
+    { $set: { _id: '$$REMOVE', 'rooms.showtimes.room': '$$REMOVE' } },
+    // 10. Sắp xếp dữ liệu
+    { $sort: { date: 1, 'rooms.showtimes.startTime': 1 } }
   ];
 
   addPaginationPipelineStage({ req, pipeline });

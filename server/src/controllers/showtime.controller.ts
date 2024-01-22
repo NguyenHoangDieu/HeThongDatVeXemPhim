@@ -4,7 +4,7 @@ import { CatchAsyncError } from '../middlewares';
 import { showtimeServices } from '../services';
 
 export const createShowtime = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  const showtime = await showtimeServices.createShowtime({ ...req.body });
+  const showtime = await showtimeServices.createShowtime({ ...req.body, theater: req.userPayload?.theater });
 
   res.sendCREATED({
     data: showtime
@@ -44,6 +44,15 @@ export const getShowtimesByMovie = CatchAsyncError(async (req: Request, res: Res
 
 export const getShowtimesByTheater = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
   const [payload] = await showtimeServices.getShowtimesByTheater(req.params.id, req);
+
+  res.sendOK({
+    data: payload?.data ?? [],
+    extra: payload?.extra ?? { totalCount: 0 }
+  });
+});
+
+export const getMyTheaterShowtimes = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  const [payload] = await showtimeServices.getMyTheaterShowtimes(req);
 
   res.sendOK({
     data: payload?.data ?? [],

@@ -17,7 +17,7 @@ FROM base as deps
 # RUN apk add --no-cache libc6-compat
 WORKDIR /usr/src/app
 COPY package.json yarn.lock ./
-RUN yarn install --production --frozen-lockfile 
+RUN yarn install --production --frozen-lockfile
 
 # Stage 3: Production
 FROM base
@@ -25,6 +25,7 @@ WORKDIR /usr/src/app
 COPY package.json ./
 COPY --from=deps /usr/src/app/node_modules ./node_modules/
 COPY --from=builder /usr/src/app/dist ./dist/
+COPY src/views/ ./dist/views/
 
 EXPOSE 8888
 

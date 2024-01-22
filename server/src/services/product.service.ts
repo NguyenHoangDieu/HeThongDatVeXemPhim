@@ -42,8 +42,8 @@ export const getProductById = async (id: string) => {
 // Xử lý các trường đa ngữ
 export const getProductDetails = async (id: string, lang?: string) => {
   const [product] = await ProductModel.aggregate([
-    { $match: { _id: convertToMongooseId(id) } },
-    { $set: { description: lang ? `$description.${lang}` : `$description` } }
+    { $match: { _id: convertToMongooseId(id) } }
+    // { $set: { description: lang ? `$description.${lang}` : `$description` } }
   ]);
   if (!product) {
     throw new NotFoundError(Message.PRODUCT_NOT_FOUND);
@@ -63,14 +63,11 @@ export const getProducts = async (req: Request) => {
 };
 
 export const getProductsByTheater = async (req: Request) => {
-  const theaterId = req.params.id ?? req.userPayload?.theater;
-  if (!theaterId) {
-    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
-  }
+  const theaterId = req.params.id;
 
   const matchPipeline = [
     {
-      $match: { theater: convertToMongooseId(req.userPayload?.theater) }
+      $match: { theater: convertToMongooseId(theaterId) }
     }
   ];
 
@@ -78,6 +75,26 @@ export const getProductsByTheater = async (req: Request) => {
     req,
     fieldsApplySearch: ['name'],
     localizationFields: ['description']
+  });
+
+  return await ProductModel.aggregate(matchPipeline).append(...options);
+};
+
+export const getProductsOfMyTheater = async (req: Request) => {
+  const theaterId = req.userPayload?.theater;
+  if (!theaterId) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
+  const matchPipeline = [
+    {
+      $match: { theater: convertToMongooseId(theaterId) }
+    }
+  ];
+
+  const options = convertRequestToPipelineStages({
+    req,
+    fieldsApplySearch: ['name']
   });
 
   return await ProductModel.aggregate(matchPipeline).append(...options);

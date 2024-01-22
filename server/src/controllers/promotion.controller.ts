@@ -11,6 +11,14 @@ export const createPromotion = CatchAsyncError(async (req: Request, res: Respons
   });
 });
 
+export const applyPromotion = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  const promotion = await promotionServices.applyPromotion({ ...req.body }, req.userPayload?.id);
+
+  res.sendOK({
+    data: promotion
+  });
+});
+
 export const updatePromotion = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
   const promotion = await promotionServices.updatePromotion(req.params.id, req.body, req.userPayload?.theater);
 
@@ -32,8 +40,10 @@ export const getPromotionDetails = CatchAsyncError(async (req: Request, res: Res
 });
 
 export const getPromotionsByTheater = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  const promotions = await promotionServices.getPromotionsByTheater(req.params.id, req.userPayload?.id);
+
   res.sendOK({
-    data: await promotionServices.getPromotionsByTheater(req.params.id)
+    data: promotions
   });
 });
 

@@ -1,18 +1,32 @@
-import { Button, Result } from "antd";
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { ROUTE } from "../../constants/router";
+import { Button, Result } from 'antd';
+import React, { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { ROUTE } from '../../constants/router';
+import { addAddresses } from '../../redux/reducer/signupSlide';
 
 export default function PrivateRouter(props) {
-  const isLoggedIn = localStorage.getItem("isLoggedIn");
+  const access_token = localStorage.getItem('admin_access_token');
+  const { children } = props;
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const onClick = () => {
     navigate(ROUTE.SIGNIN);
   };
+  const res = async () => {
+    const response = await axios.get('https://provinces.open-api.vn/api/?depth=3');
+    if (response) {
+      dispatch(addAddresses({ addresses: response.data }));
+    }
+  };
+  useEffect(() => {
+    res();
+  }, []);
   return (
     <div>
-      {isLoggedIn ? (
-        props.children
+      {access_token ? (
+        children
       ) : (
         <Result
           status="403"

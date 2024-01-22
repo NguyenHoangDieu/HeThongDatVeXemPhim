@@ -1,11 +1,22 @@
-import axios from "axios";
-import { REACT_APP_BASE_URL } from "../configs";
+import axios from 'axios';
+import { toast } from 'react-toastify';
+
+import { SERVER_URL } from '../configs';
+import apiCaller from './apiCaller';
+import { userApi } from './userApi';
+import { store } from '../redux/store';
+import { setProfile } from '../redux/reducer/userReducer';
 
 const axiosClient = axios.create({
-  baseURL: REACT_APP_BASE_URL,
+  baseURL: SERVER_URL,
 });
+
+const errorHandler = (error) => {
+  toast.error(error.message, { autoClose: 3000, theme: 'colored' });
+};
+
 axiosClient.interceptors.request.use(async (config) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem('access_token');
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -21,19 +32,43 @@ axiosClient.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
-    if (!error.response) {
-      console.error("Unknown error:", error.message);
-      return;
+
+  async (error) => {
+    const originalRequest = error.config;
+    console.log(error);
+
+    if (error.response.data.ec === 419 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const response = await apiCaller({
+        request: userApi.refreshToken({
+          refreshToken: localStorage.getItem('refresh_token'),
+        }),
+        errorHandler,
+      });
+
+      if (response) {
+        console.log('Access token refreshed:', response?.data?.accessToken);
+        const { accessToken } = response.data;
+        localStorage.setItem('access_token', accessToken);
+        originalRequest.headers = {
+          Authorization: `Bearer ${accessToken}`,
+        };
+      } else {
+        // Refresh token hết hạn
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        store.dispatch(setProfile(undefined));
+
+        return Promise.reject(error.response.data);
+      }
+
+      return axiosClient(originalRequest);
     }
 
-    const { status, data } = error.response;
-    if (status >= 500) {
-      // TODO: Show server error message
-    } else if (400 <= status && status < 500) {
-      throw data;
-    }
-  }
+    return Promise.reject(error.response.data);
+  },
 );
 
 export default axiosClient;

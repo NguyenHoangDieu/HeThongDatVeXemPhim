@@ -1,3 +1,5 @@
+import { type Request } from 'express';
+
 import { FareModel, NotFoundError } from '../models';
 import { type IUpdateFareRequest, type IFare } from '../interfaces';
 import { Message } from '../constants';
@@ -27,18 +29,34 @@ export const getFareByTheater = async (theaterId: string, lang?: string) => {
   return fare;
 };
 
-export const deleteFare = async (id: string) => {
-  return await FareModel.findByIdAndDelete(id);
+export const deleteFare = async (req: Request) => {
+  if (!req.userPayload?.theater) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
+  return await FareModel.findOneAndDelete({ theater: req.userPayload?.theater });
 };
 
-export const updateFare = async (id: string, newFare: IUpdateFareRequest) => {
+export const getFare = async (req: Request) => {
+  if (!req.userPayload?.theater) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
+  return await FareModel.findOne({ theater: req.userPayload?.theater });
+};
+
+export const updateFare = async (req: Request, newFare: IUpdateFareRequest) => {
+  if (!req.userPayload?.theater) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
   if (newFare.description && typeof newFare.description === 'string') {
     try {
       newFare.description = JSON.parse(newFare.description);
     } catch (_) {}
   }
 
-  const fare = await FareModel.findByIdAndUpdate(id, newFare, { new: true });
+  const fare = await FareModel.findOneAndUpdate({ theater: req.userPayload?.theater }, newFare, { new: true });
   if (!fare) throw new NotFoundError(Message.FARE_NOT_FOUND);
 
   return fare;

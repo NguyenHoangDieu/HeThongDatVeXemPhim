@@ -25,6 +25,9 @@ export const Message = {
   PROMOTION_NOT_FOUND: {
     msg: 'Promotion Not Found'
   },
+  PROMOTION_USED: {
+    msg: 'Promotion Is Used'
+  },
   REVIEW_NOT_FOUND: {
     msg: 'Review Not Found'
   },
@@ -55,6 +58,9 @@ export const Message = {
   TOKEN_IS_INVALID: {
     ec: 420,
     msg: 'Token is invalid'
+  },
+  INVALID_NUMBER_s: {
+    msg: 'Invalid number %s'
   },
   INVALID_EMAIL: {
     msg: 'Invalid email'
@@ -131,6 +137,9 @@ export const Message = {
   EMAIL_ALREADY_EXIST: {
     msg: 'Email already exist'
   },
+  EMAIL_NOT_EXIST: {
+    msg: 'Email not exist'
+  },
   CODE_ALREADY_EXIST: {
     msg: 'Code already exist'
   },
@@ -146,8 +155,15 @@ export const Message = {
     ec: 419,
     msg: 'Token is expired, Try again'
   },
+  TOKEN_IS_EXPIRED_TRY_AGAIN_NO_EC: {
+    ec: 10019,
+    msg: 'Token is expired, Try again'
+  },
   SESSION_EXPIRED: {
     msg: 'Session Expired'
+  },
+  PROMOTION_EXPIRED_OR_UNAVAILABLE: {
+    msg: 'Promotion expired or unavailable'
   },
 
   // Empty
@@ -268,13 +284,19 @@ export const Message = {
   REDIS_CONNECTION_FAIL: {
     msg: 'Redis connection fail'
   },
-  ACCOUNT_NOT_ACTIVATED: {
-    msg: 'Account Not Activated'
+  ACCOUNT_BLOCKED: {
+    msg: 'Account Blocked'
   },
   ACCOUNT_ACTIVATED: {
     msg: 'Account Activated'
   },
   INSUFFICIENT_ACCESS_RIGHTS: {
     msg: 'Insufficient Access Rights'
+  },
+
+  // Error With Specific ErrorCode
+  ACCOUNT_NOT_ACTIVATED: {
+    ec: 111111,
+    msg: 'Account Not Activated'
   }
 };

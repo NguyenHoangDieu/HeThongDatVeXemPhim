@@ -21,6 +21,8 @@ const updateMovieOrTheaterRatingData = async (review: any) => {
     ]);
 
     await MovieModel.findByIdAndUpdate(review.movie, result[0]);
+
+    return result[0];
   } else if (review.theater) {
     const result = await ReviewModel.aggregate([
       { $match: { theater: review.theater } },
@@ -35,6 +37,8 @@ const updateMovieOrTheaterRatingData = async (review: any) => {
     ]);
 
     await TheaterModel.findByIdAndUpdate(review.theater, result[0]);
+
+    return result[0];
   }
 };
 
@@ -50,12 +54,12 @@ export const createOrUpdateReview = async (review: IReview) => {
 
   const newReview = await ReviewModel.findOneAndUpdate(find, review, { new: true, upsert: true });
 
-  await updateMovieOrTheaterRatingData(newReview);
-
-  return newReview;
+  return await updateMovieOrTheaterRatingData(newReview);
 };
 
 export const getReviewsByMovie = async (req: Request) => {
+  const userId = req.userPayload?.id ?? '-';
+
   const pipeline: PipelineStage[] = [
     { $match: { isActive: true, movie: convertToMongooseId(req.params.id) } },
     {
@@ -67,7 +71,9 @@ export const getReviewsByMovie = async (req: Request) => {
         as: 'user'
       }
     },
-    { $unwind: '$user' }
+    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    { $addFields: { mine: { $eq: [{ $toString: '$user._id' }, userId] } } },
+    { $sort: { mine: -1, createdAt: -1 } }
   ];
 
   addPaginationPipelineStage({ req, pipeline });
@@ -76,6 +82,8 @@ export const getReviewsByMovie = async (req: Request) => {
 };
 
 export const getReviewsByTheater = async (req: Request) => {
+  const userId = req.userPayload?.id ?? '-';
+
   const pipeline: PipelineStage[] = [
     { $match: { isActive: true, theater: convertToMongooseId(req.params.id) } },
     {
@@ -87,7 +95,34 @@ export const getReviewsByTheater = async (req: Request) => {
         as: 'user'
       }
     },
-    { $unwind: '$user' }
+    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    { $addFields: { mine: { $eq: [{ $toString: '$user._id' }, userId] } } },
+    { $sort: { mine: -1, createdAt: -1 } }
+  ];
+
+  addPaginationPipelineStage({ req, pipeline });
+
+  return await ReviewModel.aggregate(pipeline);
+};
+
+export const getReviewsOfMyTheater = async (req: Request) => {
+  if (!req.userPayload?.theater) {
+    throw new NotFoundError(Message.MANAGER_THEATER_EMPTY);
+  }
+
+  const pipeline: PipelineStage[] = [
+    { $match: { theater: convertToMongooseId(req.userPayload?.theater) } },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'user',
+        foreignField: '_id',
+        pipeline: [{ $project: { _id: 1, name: 1, email: 1, avatar: 1 } }],
+        as: 'user'
+      }
+    },
+    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+    { $sort: { createdAt: -1 } }
   ];
 
   addPaginationPipelineStage({ req, pipeline });
@@ -102,6 +137,17 @@ export const deleteReview = async (id: string) => {
   }
 
   await updateMovieOrTheaterRatingData(doc);
+};
+
+export const myReview = async (req: Request) => {
+  const userId = req.userPayload?.id ?? '-';
+
+  const review = await ReviewModel.findOne({
+    user: userId,
+    $or: [{ theater: req.params.id }, { movie: req.params.id }, { _id: req.params.id }]
+  });
+
+  return review ?? {};
 };
 
 export const toggleActiveReview = async (id: string) => {

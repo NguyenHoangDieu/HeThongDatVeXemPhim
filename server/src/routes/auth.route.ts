@@ -178,6 +178,7 @@ export const authRouter = router;
  *              - name
  *              - email
  *              - password
+ *              - phoneNumber
  *            properties:
  *              name:
  *                type: string
@@ -188,6 +189,9 @@ export const authRouter = router;
  *              password:
  *                type: string
  *                default: 123456
+ *              phoneNumber:
+ *                type: string
+ *                default: ''
  *
  *        application/x-www-form-urlencoded:
  *          schema:

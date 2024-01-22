@@ -1,4 +1,5 @@
 import jwt, { type Secret } from 'jsonwebtoken';
+import { type Request } from 'express';
 
 import {
   type IActivationToken,
@@ -7,15 +8,17 @@ import {
   type IResetPasswordToken,
   type IUpdateProfileRequest
 } from '../interfaces';
-import { BadRequestError, NotFoundError, UserModel } from '../models';
-import logger, { SendMail, omitIsNil } from '../utils';
+import { BadRequestError, MovieModel, NotFoundError, TheaterModel, UserModel } from '../models';
+import logger, { SendMail, convertRequestToPipelineStages, convertToMongooseId, omitIsNil } from '../utils';
 import { AVATAR_UPLOAD_FOLDER, Message } from '../constants';
 import { cloudinaryServices } from '.';
+import { type PipelineStage } from 'mongoose';
 
 export const createUser = async (user: IUser) => {
   const isEmailExist = await findUserByEmail(user.email);
   if (isEmailExist) {
-    throw new BadRequestError(Message.EMAIL_ALREADY_EXIST);
+    if (!isEmailExist.isVerified) throw new BadRequestError(Message.ACCOUNT_NOT_ACTIVATED);
+    else throw new BadRequestError(Message.EMAIL_ALREADY_EXIST);
   }
 
   const newUser = new UserModel(user);
@@ -27,10 +30,30 @@ export const findUserByEmail = async (email: string, password: boolean = false) 
   return await UserModel.findOne({ email }).select(password ? '+password' : '-password');
 };
 
+export const getUsers = async (req: Request) => {
+  const options = convertRequestToPipelineStages({
+    req,
+    fieldsApplySearch: ['_id', 'email', 'name', 'phoneNumber', 'provider']
+  });
+
+  return await UserModel.aggregate(options);
+};
+
+export const toggleBlock = async (id: string) => {
+  const user = await UserModel.findById(id);
+  if (!user) {
+    throw new NotFoundError(Message.USER_NOT_FOUND);
+  }
+
+  user.isBlocked = !user.isBlocked;
+
+  return await user.save();
+};
+
 export const getUserByEmail = async (email: string, password: boolean = false) => {
   const user = await UserModel.findOne({ email }).select(password ? '+password' : '-password');
   if (!user) {
-    throw new NotFoundError(Message.EMAIL_ALREADY_EXIST);
+    throw new NotFoundError(Message.EMAIL_NOT_EXIST);
   }
 
   return user;
@@ -39,7 +62,7 @@ export const getUserByEmail = async (email: string, password: boolean = false) =
 export const getUserById = async (id: string, password: boolean = false) => {
   const user = await UserModel.findById(id).select(password ? '+password' : '-password');
   if (!user) {
-    throw new NotFoundError(Message.EMAIL_ALREADY_EXIST);
+    throw new NotFoundError(Message.USER_NOT_FOUND);
   }
 
   return user;
@@ -48,10 +71,114 @@ export const getUserById = async (id: string, password: boolean = false) => {
 export const getUser = async (filters: any, password: boolean = false) => {
   const user = await UserModel.findOne(omitIsNil(filters)).select(password ? '+password' : '-password');
   if (!user) {
-    throw new NotFoundError(Message.EMAIL_ALREADY_EXIST);
+    throw new NotFoundError(Message.USER_NOT_FOUND);
   }
 
   return user;
+};
+
+export const toggleFavoriteMovie = async (req: Request) => {
+  if (!req.userPayload?.id) {
+    throw new NotFoundError(Message.USER_NOT_FOUND);
+  }
+
+  const user = await getUserById(req.userPayload?.id);
+
+  const index = user.favoriteMovies.indexOf(req.params.id);
+  // Bỏ yêu thích
+  if (index > -1) {
+    user.favoriteMovies.splice(index, 1);
+    await MovieModel.findByIdAndUpdate(req.params.id, { $inc: { totalFavorites: -1 } });
+  }
+  // Yêu thích
+  else {
+    user.favoriteMovies.push(req.params.id);
+    await MovieModel.findByIdAndUpdate(req.params.id, { $inc: { totalFavorites: 1 } });
+  }
+
+  return await user.save();
+};
+
+export const toggleFavoriteTheater = async (req: Request) => {
+  if (!req.userPayload?.id) {
+    throw new NotFoundError(Message.USER_NOT_FOUND);
+  }
+
+  const user = await getUserById(req.userPayload?.id);
+
+  const index = user.favoriteTheaters.indexOf(req.params.id);
+  if (index > -1) {
+    user.favoriteTheaters.splice(index, 1);
+    await TheaterModel.findByIdAndUpdate(req.params.id, { $inc: { totalFavorites: -1 } });
+  } else {
+    user.favoriteTheaters.push(req.params.id);
+    await TheaterModel.findByIdAndUpdate(req.params.id, { $inc: { totalFavorites: 1 } });
+  }
+
+  return await user.save();
+};
+
+export const myFavorite = async (req: Request) => {
+  const piplelines: PipelineStage[] = [
+    { $match: { _id: convertToMongooseId(req.userPayload?.id) } },
+    { $project: { favoriteMovies: 1, favoriteTheaters: 1, _id: 0 } },
+    {
+      $lookup: {
+        from: 'movies',
+        localField: 'favoriteMovies',
+        foreignField: '_id',
+        pipeline: [
+          {
+            $lookup: {
+              from: 'genres',
+              localField: 'genres',
+              foreignField: '_id',
+              as: 'genres',
+              pipeline: [{ $project: { name: 1 } }]
+            }
+          },
+          {
+            $project: {
+              genres: `$genres.name.${req.getLocale()}`,
+              _id: 1,
+              title: 1,
+              originalTitle: 1,
+              trailer: 1,
+              poster: 1,
+              duration: 1,
+              releaseDate: 1,
+              overview: `$overview.${req.getLocale()}`,
+              ageType: 1,
+              ratingAverage: 1,
+              ratingCount: 1,
+              createdAt: 1
+            }
+          }
+        ],
+        as: 'favoriteMovies'
+      }
+    },
+    {
+      $lookup: {
+        from: 'theaters',
+        localField: 'favoriteTheaters',
+        foreignField: '_id',
+        pipeline: [
+          {
+            $set: {
+              description: `$description.name.${req.getLocale()}`,
+              coordinates: '$location.coordinates',
+              location: '$$REMOVE'
+            }
+          }
+        ],
+        as: 'favoriteTheaters'
+      }
+    },
+    { $project: { movies: '$favoriteMovies', theaters: '$favoriteTheaters' } }
+  ];
+
+  return await UserModel.aggregate(piplelines);
 };
 
 export const updateProfile = async (id: string, newProfile: IUpdateProfileRequest) => {

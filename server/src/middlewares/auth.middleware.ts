@@ -73,16 +73,20 @@ export const isAuthenticatedOrNot = CatchAsyncError(async (req: Request, res: Re
   }
 
   // Giải mã lấy id
-  const payload = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET as string) as JwtPayload;
-  if (!payload) {
+  try {
+    const payload = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET as string) as JwtPayload;
+    if (!payload) {
+      next();
+      return;
+    }
+
+    req.userPayload = payload;
+    req.accessToken = accessToken;
+
     next();
-    return;
+  } catch (_) {
+    next();
   }
-
-  req.userPayload = payload;
-  req.accessToken = accessToken;
-
-  next();
 });
 
 export const verifyRefreshToken = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
@@ -92,30 +96,35 @@ export const verifyRefreshToken = CatchAsyncError(async (req: Request, res: Resp
     return;
   }
 
-  const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as JwtPayload;
-  if (!payload) {
-    next(new BadRequestError(Message.TOKEN_IS_INVALID_TRY_AGAIN));
-    return;
+  try {
+    const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as JwtPayload;
+
+    if (!payload) {
+      next(new BadRequestError(Message.TOKEN_IS_INVALID_TRY_AGAIN));
+      return;
+    }
+
+    // verify if token is in store or not
+    const userJSON = await redis.get(payload.id as string);
+    if (!userJSON) {
+      next(new NotFoundError(Message.USER_NOT_FOUND));
+      return;
+    }
+
+    const user = JSON.parse(userJSON); // { accessToken, refreshToken }
+
+    if (user.refreshToken !== refreshToken) {
+      next(new BadRequestError(Message.TOKEN_IS_INVALID));
+      return;
+    }
+
+    req.userPayload = payload;
+    req.accessToken = user.accessToken;
+
+    next();
+  } catch (_) {
+    next(new BadRequestError(Message.TOKEN_IS_EXPIRED_TRY_AGAIN_NO_EC));
   }
-
-  // verify if token is in store or not
-  const userJSON = await redis.get(payload.id as string);
-  if (!userJSON) {
-    next(new NotFoundError(Message.USER_NOT_FOUND));
-    return;
-  }
-
-  const user = JSON.parse(userJSON); // { accessToken, refreshToken }
-
-  if (user.refreshToken !== refreshToken) {
-    next(new BadRequestError(Message.TOKEN_IS_INVALID));
-    return;
-  }
-
-  req.userPayload = payload;
-  req.accessToken = user.accessToken;
-
-  next();
 });
 
 // Check role

@@ -2,6 +2,7 @@ import { type NextFunction, type Request, type Response } from 'express';
 
 import { CatchAsyncError } from '../middlewares';
 import { movieServices } from '../services';
+import { Roles } from '../constants';
 
 //! Create a movie
 export const createMovie = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
@@ -44,10 +45,11 @@ export const getComingSoonMovies = CatchAsyncError(async (req: Request, res: Res
 
 //! Phim chiếu sớm
 export const getSneakShowMovies = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  const movies = await movieServices.getSneakShowMovies(req); // [ { extra: {}, data: [] } ]
+  const [payload] = await movieServices.getSneakShowMovies(req); // [ { extra: {}, data: [] } ]
 
   res.sendOK({
-    data: movies
+    data: payload?.data ?? [],
+    extra: payload?.extra ?? { totalCount: 0 }
   });
 });
 
@@ -62,7 +64,9 @@ export const getMostRateMovies = CatchAsyncError(async (req: Request, res: Respo
 
 //! Movie details
 export const getMovieDetails = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  const movie = await movieServices.getMovieDetails(req.params.id, req.getLocale());
+  const movie = await (req.userPayload?.role === Roles.Admin
+    ? movieServices.getMovieDetailsByAdmin(req)
+    : movieServices.getMovieDetails(req.params.id, req.getLocale(), req.userPayload?.id));
 
   res.sendOK({
     data: movie

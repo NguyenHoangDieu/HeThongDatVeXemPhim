@@ -56,3 +56,13 @@ export const getProductsByTheater = CatchAsyncError(async (req: Request, res: Re
     extra: payload?.extra ?? { totalCount: 0 }
   });
 });
+
+//! Get List Product
+export const getProductsOfMyTheater = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  const [payload] = await productServices.getProductsOfMyTheater(req); // [ { extra: {}, data: [] } ]
+
+  res.sendOK({
+    data: payload?.data ?? [],
+    extra: payload?.extra ?? { totalCount: 0 }
+  });
+});

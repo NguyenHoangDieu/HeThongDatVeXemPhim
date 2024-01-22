@@ -12,7 +12,7 @@ const adminRoles = [Roles.Manager, Roles.Admin];
 router.post('/create', isAuthenticated, authorizeRoles(...adminRoles), productController.createProduct);
 // router.get('/list', isAuthenticated, authorizeRoles(Roles.Admin), productController.getProducts);
 router.get('/list-by-theater/:id', productController.getProductsByTheater);
-router.get('/my-theater', isAuthenticated, authorizeRoles(...adminRoles), productController.getProductsByTheater);
+router.get('/my-theater', isAuthenticated, authorizeRoles(...adminRoles), productController.getProductsOfMyTheater);
 
 router
   .route('/details/:id')
@@ -74,52 +74,7 @@ export const productRouter = router;
  *              $ref: '#/components/schemas/Response'
  */
 
-//! List Product
-/**
- * @swagger
- * /product/list:
- *  get:
- *    tags: [Product]
- *    summary: "[Manager] Danh sách product"
- *    parameters:
- *      - in: query
- *        name: hl
- *        type: string
- *        default: vi
- *        description: Ngôn ngữ trả về 'en | vi'
- *      - in: query
- *        name: keyword
- *        type: string
- *        description: Tìm theo tên
- *      - in: query
- *        name: page
- *        type: string
- *        description: Trang hiện tại
- *      - in: query
- *        name: limit
- *        type: string
- *        description: Số lượng kết quả mỗi trang
- *      - in: query
- *        name: sort
- *        type: string
- *        hint: ht
- *        description: Sắp xếp (\+fullName, fullName, \-fullName)
- *      - in: query
- *        name: fields
- *        type: string
- *        description: Giới hạn trường trả về (cách nhau bởi dấu phẩy)
- *    security:
- *      - BearerToken: []
- *    responses:
- *      200:
- *        description: Success
- *        content:
- *          application/json:
- *            schema:
- *              $ref: '#/components/schemas/ListResponse'
- */
-
-//! List Product By Theater
+//! List Product - My Theater
 /**
  * @swagger
  * /product/my-theater:
@@ -232,6 +187,8 @@ export const productRouter = router;
  *  get:
  *    tags: [Product]
  *    summary: "[Manager] Thông tin chi tiết product"
+ *    security:
+ *      - BearerToken: []
  *    parameters:
  *      - in: query
  *        name: hl

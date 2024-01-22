@@ -3,6 +3,7 @@ import { type Server as HttpServer } from 'http';
 
 import logger from './utils';
 import { redis } from './config/redis';
+import { roomServices } from './services';
 
 export class SocketServer {
   static instance: SocketServer;
@@ -50,71 +51,94 @@ export class SocketServer {
     // Khi người dùng bắt đầu vào giao diện chọn ghế
     socket.on(
       'startBooking',
-      async ({ userId, showtimeId, endTime }: { userId: string; showtimeId: string; endTime: string }) => {
+      async ({
+        userId,
+        showtimeId,
+        endTime,
+        roomId
+      }: {
+        userId: string;
+        showtimeId: string;
+        endTime: string;
+        roomId: string;
+      }) => {
         // Tạo redis json và set hạn nếu chưa tồn tại
         // -2 (Không tồn tại), -1 (tồn tại nhưng chưa set hạn), second (số giây còn lại)
         if ((await redis.ttl(showtimeId)) === -2) {
-          await redis.call('JSON.MSET', showtimeId, '$', '{}');
-          await redis.expireat(showtimeId, endTime);
+          try {
+            await redis.multi().call('JSON.SET', showtimeId, '$', '{}').expireat(showtimeId, endTime).exec();
+          } catch (e) {
+            logger.error(e);
+          }
         }
 
         // Join room, nếu đã có thì bỏ qua
         await socket.join(showtimeId);
 
-        // Trả về danh sách ghế đang được chọn
-        // Gồm: "của mình" và "không phải của mình" và "ds đã đặt"
-        socket.emit('reservedSeats', await this.getListReservedSeats(userId, showtimeId));
+        try {
+          const { seats, my } = await this.getListReservedSeats(userId, showtimeId, roomId);
+
+          // Trả về danh sách ghế đang được chọn
+          // Gồm: "của mình" và "không phải của mình" và "ds đã đặt"
+          socket.emit('reservedSeats', seats, my);
+        } catch (e: any) {
+          socket.emit('error', e.message);
+        }
       }
     );
 
     // Khi hết hạn đặt hoặc người dùng rời khỏi trang đặt
-    socket.on('cancelBooking', async ({ seatIds, showtimeId }: { seatIds: string[]; showtimeId: string }) => {
+    socket.on('cancelBooking', async ({ seats, showtimeId }: { seats: any[]; showtimeId: string }) => {
       // Xóa data redis
-      for (const seat of seatIds) {
-        await redis.call('JSON.DEL', showtimeId, `$.${seat}`);
+      for (const seat of seats) {
+        await redis.call('JSON.DEL', showtimeId, `$.${seat.id}`);
       }
 
       // Gửi tới những người khác trong room
-      socket.broadcast.to(showtimeId).emit('cancelSeat', seatIds);
+      socket.broadcast.to(showtimeId).emit('cancelSeat', seats);
 
       // Rời room
       await socket.leave(showtimeId);
     });
 
     // Hoàn thành đặt
-    socket.on('completeBooking', async ({ seatIds, showtimeId }: { seatIds: string[]; showtimeId: string }) => {
+    socket.on('completeBooking', async ({ seats, showtimeId }: { seats: any[]; showtimeId: string }) => {
       // Xóa data redis
-      for (const seat of seatIds) {
-        await redis.call('JSON.DEL', showtimeId, `$.${seat}`);
+      for (const seat of seats) {
+        await redis.call('JSON.DEL', showtimeId, `$.${seat.id}`);
       }
 
       // Gửi tới những người khác
-      socket.broadcast.to(showtimeId).emit('completeSeat', seatIds);
+      socket.broadcast.to(showtimeId).emit('completeSeat', seats);
 
       // Rời room
       await socket.leave(showtimeId);
     });
 
     // Khi chọn 1 ghế
-    socket.on(
-      'select',
-      async ({ userId, showtimeId, seatId }: { userId: string; showtimeId: string; seatId: string }) => {
-        try {
-          // update redis
-          await redis.call('JSON.MSET', showtimeId, `$.${seatId}`, userId);
+    socket.on('select', async ({ userId, showtimeId, seat }: { userId: string; showtimeId: string; seat: any }) => {
+      try {
+        const seatId = seat._id;
+        const x = seat.coordinates[0];
+        const y = seat.coordinates[1];
 
-          // send seat to others
-          socket.broadcast.to(showtimeId).emit('addSeat', seatId);
-          // send seat to current user
-          socket.emit('addSeat', seatId);
-        } catch (_) {
-          socket.emit('error', 'Ghế không còn tồn tại nữa, vui lòng chọn ghế khác!');
-        }
+        const data = { userId, x, y };
+        // update redis
+        await redis.multi().call('JSON.SET', showtimeId, `$.${seatId}`, JSON.stringify(data)).exec();
+
+        // send seat to others
+        socket.broadcast.to(showtimeId).emit('addSeat', seat, 'Reserved');
+        // send seat to current user
+        socket.emit('addSeat', seat, 'Selected');
+      } catch (_) {
+        socket.emit('error', 'Ghế không còn tồn tại nữa, vui lòng chọn ghế khác!');
       }
-    );
+    });
 
     // Khi hủy chọn ghế
-    socket.on('deselect', async ({ showtimeId, seatId }: { showtimeId: string; seatId: string }) => {
+    socket.on('deselect', async ({ showtimeId, seat }: { showtimeId: string; seat: any }) => {
+      const seatId = seat._id;
+
       // update redis
       const numsDel = await redis.call('JSON.DEL', showtimeId, `$.${seatId}`);
 
@@ -122,29 +146,49 @@ export class SocketServer {
         socket.emit('error', 'Có lỗi xảy ra, vui lòng thử lại');
       } else {
         // send seat to others
-        socket.broadcast.to(showtimeId).emit('removeSeat', seatId);
+        socket.broadcast.to(showtimeId).emit('removeSeat', seat);
         // send seat to current user
-        socket.emit('removeSeat', seatId);
+        socket.emit('removeSeat', seat);
       }
     });
   };
 
-  getListReservedSeats = async (userId: string, showtimeId: string) => {
-    const seats = JSON.parse((await redis.call('JSON.GET', showtimeId, '$')) as string);
-    if (!seats) return '';
+  getListReservedSeats = async (userId: string, showtimeId: string, roomId: string) => {
+    const data = await roomServices.getSeatListWithStatus(roomId, showtimeId);
 
-    const obj = seats[0];
+    if (!data) throw new Error('Phòng không tồn tại');
 
-    // Danh sách ghế tôi đặt
-    const my = (Object.keys(obj) as Array<keyof typeof obj>).find((key) => {
-      return obj[key] === userId;
-    });
+    const seats = data.reduce((acc: any, seat) => {
+      const rowIndex = seat.coordinates[0];
 
-    // Danh sách ghế không phải tôi đặt
-    const other = (Object.keys(obj) as Array<keyof typeof obj>).find((key) => {
-      return obj[key] !== userId;
-    });
+      if (!acc[rowIndex]) {
+        acc[rowIndex] = [];
+      }
 
-    return { my, other };
+      acc[rowIndex].push(seat);
+      return acc;
+    }, []);
+
+    const my: any[] = [];
+
+    const _seats = JSON.parse((await redis.call('JSON.GET', showtimeId, '$')) as string);
+    if (_seats?.length) {
+      const obj = _seats[0];
+
+      (Object.keys(obj) as Array<keyof typeof obj>).forEach((key) => {
+        // Danh sách ghế tôi đặt
+        if (obj[key].userId === userId) {
+          const _seat = seats[obj[key].x][obj[key].y];
+          _seat.status = 'Selected';
+          my.push(_seat);
+        }
+        // Danh sách ghế không phải tôi đặt
+        else {
+          seats[obj[key].x][obj[key].y].status = 'Reserved';
+        }
+      });
+    }
+
+    return { seats, my };
   };
 }
